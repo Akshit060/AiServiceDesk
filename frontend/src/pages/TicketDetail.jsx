@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { fetchTicket, updateTicket, addComment, analyzeTicket, fetchRelatedTickets, fetchCategories, fetchAgents } from '../services/api';
+import { fetchTicket, updateTicket, addComment, analyzeTicket, fetchRelatedTickets, fetchCategories, fetchAgents, generateResolutionDraft, chatAboutTicket } from '../services/api';
 import { useToast } from '../components/Toast';
 
 export default function TicketDetail() {
@@ -19,9 +19,14 @@ export default function TicketDetail() {
   const [commentBody, setCommentBody] = useState('');
   const [addingComment, setAddingComment] = useState(false);
 
-  // AI
+  // AI Copilot
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [draftResult, setDraftResult] = useState(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
 
   // Related
   const [relatedTickets, setRelatedTickets] = useState([]);
@@ -105,6 +110,41 @@ export default function TicketDetail() {
       setAiResult({ available: false, error: err.message });
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleGenerateDraft = async () => {
+    setDraftLoading(true);
+    setDraftResult(null);
+    try {
+      const result = await generateResolutionDraft(id);
+      setDraftResult(result);
+    } catch (err) {
+      setDraftResult({ available: false, error: err.message });
+    } finally {
+      setDraftLoading(false);
+    }
+  };
+
+  const handleChat = async () => {
+    if (!chatQuestion.trim()) return;
+    const q = chatQuestion.trim();
+    setChatQuestion('');
+    const newHistory = [...chatHistory, { role: 'user', content: q }];
+    setChatHistory(newHistory);
+    setChatLoading(true);
+    
+    try {
+      const result = await chatAboutTicket(id, { question: q, history: newHistory });
+      if (result.available) {
+        setChatHistory([...newHistory, { role: 'assistant', content: result.answer }]);
+      } else {
+        setChatHistory([...newHistory, { role: 'system', content: `Error: ${result.error}` }]);
+      }
+    } catch (err) {
+      setChatHistory([...newHistory, { role: 'system', content: `Error: ${err.message}` }]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -197,10 +237,18 @@ export default function TicketDetail() {
 
           {/* AI Analysis */}
           <div className="card detail-section">
-            <h3>🤖 AI Investigation Copilot</h3>
-            <button className="btn btn-primary" onClick={handleAnalyze} disabled={aiLoading} style={{ marginBottom: '16px' }}>
-              {aiLoading ? 'Analyzing...' : '✨ Analyze Incident'}
-            </button>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🤖 AI Investigation Copilot</h3>
+            
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={handleAnalyze} disabled={aiLoading}>
+                {aiLoading ? 'Analyzing...' : '✨ Analyze Incident'}
+              </button>
+              <button className="btn btn-secondary" onClick={handleGenerateDraft} disabled={draftLoading || ticket.status === 'resolved'}>
+                {draftLoading ? 'Drafting...' : '📝 Generate Resolution Draft'}
+              </button>
+            </div>
+
+            {/* AI Analysis Result */}
             {aiResult && (
               aiResult.available === false ? (
                 <div className="ai-unavailable">{aiResult.error}</div>
@@ -226,6 +274,73 @@ export default function TicketDetail() {
                 </div>
               )
             )}
+
+            {/* AI Draft Result */}
+            {draftResult && (
+              draftResult.available === false ? (
+                <div className="ai-unavailable" style={{ marginTop: '16px' }}>{draftResult.error}</div>
+              ) : (
+                <div className="ai-panel" style={{ marginTop: '16px', borderLeftColor: 'var(--success)' }}>
+                  <div className="ai-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4 style={{ margin: 0 }}>Resolution Draft</h4>
+                      <button 
+                        className="btn btn-sm btn-success" 
+                        onClick={() => setResolution(draftResult.draft)}
+                      >
+                        Use Draft
+                      </button>
+                    </div>
+                    <p style={{ whiteSpace: 'pre-wrap' }}>{draftResult.draft}</p>
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* AI Chat */}
+            <div className="ai-panel" style={{ marginTop: '16px', borderLeftColor: '#3b82f6', background: 'transparent', padding: 0 }}>
+              <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+                <h4 style={{ margin: 0 }}>Chat with Copilot</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Ask questions about this ticket and its historical evidence.</p>
+              </div>
+              
+              {chatHistory.length > 0 && (
+                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {chatHistory.map((msg, idx) => (
+                    <div key={idx} style={{ 
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      background: msg.role === 'user' ? 'var(--accent)' : 'var(--bg-tertiary)',
+                      color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      maxWidth: '85%',
+                      fontSize: '13px',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {msg.role === 'system' ? `⚠️ ${msg.content}` : msg.content}
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ alignSelf: 'flex-start', color: 'var(--text-muted)', fontSize: '13px' }}>Copilot is typing...</div>
+                  )}
+                </div>
+              )}
+              
+              <div style={{ padding: '12px', display: 'flex', gap: '8px', borderTop: '1px solid var(--border-color)' }}>
+                <input 
+                  type="text" 
+                  placeholder="Ask a question..." 
+                  value={chatQuestion}
+                  onChange={e => setChatQuestion(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleChat()}
+                  style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius)', color: 'var(--text-primary)' }}
+                  disabled={chatLoading}
+                />
+                <button className="btn btn-secondary" onClick={handleChat} disabled={chatLoading || !chatQuestion.trim()}>
+                  Send
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Related Historical Tickets */}

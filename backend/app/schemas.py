@@ -157,6 +157,20 @@ class AIErrorResponse(BaseModel):
     available: bool = False
     error: str = "AI analysis is currently unavailable."
 
+class AIResolutionDraftResponse(BaseModel):
+    draft: Optional[str] = None
+    available: bool = True
+    error: Optional[str] = None
+
+class AIChatRequest(BaseModel):
+    question: str
+    history: List[dict] = []
+
+class AIChatResponse(BaseModel):
+    answer: Optional[str] = None
+    available: bool = True
+    error: Optional[str] = None
+
 class RelatedTicketResponse(BaseModel):
     id: int
     summary: str

@@ -66,3 +66,13 @@ class Comment(Base):
 
     ticket = relationship("Ticket", back_populates="comments")
     agent = relationship("Agent", back_populates="comments")
+
+
+class TicketEmbedding(Base):
+    __tablename__ = "ticket_embeddings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), unique=True, nullable=False)
+    embedding = Column(Text, nullable=False)  # JSON serialized list of floats
+
+    ticket = relationship("Ticket")

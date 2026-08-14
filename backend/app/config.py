@@ -6,8 +6,8 @@ import os
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama3-8b-8192"
     DATABASE_URL: str = "sqlite:///./servicedesk.db"
 
     # HuggingFace dataset paths

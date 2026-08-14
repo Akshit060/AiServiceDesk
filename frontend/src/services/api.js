@@ -42,6 +42,9 @@ export const addComment = (ticketId, data) => request(`/tickets/${ticketId}/comm
 export const analyzeTicket = (ticketId) => request(`/tickets/${ticketId}/analyze`, { method: 'POST' });
 export const classifyTicket = (data) => request('/tickets/classify', { method: 'POST', body: JSON.stringify(data) });
 export const fetchRelatedTickets = (ticketId) => request(`/tickets/${ticketId}/related`);
+export const generateResolutionDraft = (ticketId) => request(`/tickets/${ticketId}/generate-resolution`, { method: 'POST' });
+export const chatAboutTicket = (ticketId, data) => request(`/tickets/${ticketId}/chat`, { method: 'POST', body: JSON.stringify(data) });
+export const rebuildEmbeddings = () => request('/embeddings/rebuild', { method: 'POST' });
 
 // Knowledge Base
 export const fetchKnowledgeBase = (params = {}) => {
